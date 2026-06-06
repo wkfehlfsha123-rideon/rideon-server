@@ -120,5 +120,30 @@ app.patch('/api/users/:id', async (req, res) => {
 app.get('/', (req, res) => {
   res.json({ status: 'ok', riders: baeminData?.riders?.length || 0, savedAt: baeminData?.savedAt || null });
 });
+// ── 아이디 찾기 ──
+app.post('/api/find-id', async (req, res) => {
+  try {
+    const { name, phone } = req.body;
+    const users = await supabase('GET', `/users?name=eq.${encodeURIComponent(name)}&phone=eq.${encodeURIComponent(phone)}&select=username`);
+    if(!users || users.length === 0) {
+      return res.status(404).json({ success: false, error: '일치하는 계정이 없습니다' });
+    }
+    res.json({ success: true, username: users[0].username });
+  } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+});
 
+// ── 비밀번호 찾기 ──
+app.post('/api/find-pw', async (req, res) => {
+  try {
+    const { username, phone } = req.body;
+    const users = await supabase('GET', `/users?username=eq.${username}&phone=eq.${encodeURIComponent(phone)}&select=id`);
+    if(!users || users.length === 0) {
+      return res.status(404).json({ success: false, error: '일치하는 계정이 없습니다' });
+    }
+    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    const tempPw = Array.from({length: 8}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+    await supabase('PATCH', `/users?id=eq.${users[0].id}`, { password: tempPw });
+    res.json({ success: true, tempPassword: tempPw });
+  } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+});
 app.listen(PORT, () => console.log('RideOn 서버 실행 중:', PORT));
