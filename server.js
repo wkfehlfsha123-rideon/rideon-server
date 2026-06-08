@@ -51,7 +51,6 @@ app.get('/api/data', (req, res) => {
 app.get('/api/data/:region', (req, res) => {
   const { region } = req.params;
   res.json(baeminData[region] || { riders: [], savedAt: null });
-});
 
 // ── 회원가입 ──
 app.post('/api/signup', async (req, res) => {
