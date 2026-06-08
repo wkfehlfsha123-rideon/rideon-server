@@ -25,18 +25,32 @@ async function supabase(method, path, body) {
 }
 
 // 배민 데이터 저장소
-let baeminData = null;
+let baeminData = {};
 
 // ── 배민 데이터 수신 ──
 app.post('/api/data', (req, res) => {
-  baeminData = { ...req.body, savedAt: new Date().toISOString() };
-  console.log('[RideOn] 데이터 수신:', baeminData.riders?.length, '명');
-  res.json({ success: true });
+  const { regionId, riders, summary } = req.body;
+  const region = regionId || 'unknown';
+  baeminData[region] = { riders: riders || [], savedAt: new Date().toISOString(), summary };
+  console.log(`[RideOn] ${region} 데이터 수신: ${riders?.length}명`);
+  res.json({ success: true, region });
 });
 
 // ── 배민 데이터 조회 ──
 app.get('/api/data', (req, res) => {
-  res.json(baeminData || { riders: [], savedAt: null });
+  const { region } = req.query;
+  if (region && baeminData[region]) {
+    return res.json(baeminData[region]);
+  }
+  const allRiders = Object.values(baeminData).flatMap(d => d.riders || []);
+  const latest = Object.values(baeminData).map(d => d.savedAt).sort().pop();
+  res.json({ riders: allRiders, savedAt: latest || null, regions: baeminData });
+});
+
+// ── 지역별 데이터 조회 ──
+app.get('/api/data/:region', (req, res) => {
+  const { region } = req.params;
+  res.json(baeminData[region] || { riders: [], savedAt: null });
 });
 
 // ── 회원가입 ──
