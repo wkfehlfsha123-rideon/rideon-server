@@ -132,7 +132,9 @@ app.patch('/api/users/:id', async (req, res) => {
 
 // ── 헬스체크 ──
 app.get('/', (req, res) => {
-  res.json({ status: 'ok', riders: baeminData?.riders?.length || 0, savedAt: baeminData?.savedAt || null });
+  const allRiders = Object.values(baeminData).flatMap(d => d.riders || []);
+  res.json({ status: 'ok', riders: allRiders.length, regions: Object.keys(baeminData) });
+});
 });
 // ── 아이디 찾기 ──
 app.post('/api/find-id', async (req, res) => {
