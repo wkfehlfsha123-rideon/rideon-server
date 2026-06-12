@@ -105,15 +105,9 @@ app.post('/api/find-pw', async (req, res) => {
   } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
-app.get('/', (req, res) => {
-  const allRiders = Object.values(baeminData).flatMap(d => d.riders || []);
-  res.json({ status: 'ok', riders: allRiders.length, regions: Object.keys(baeminData) });
-});
-// ── 정산 데이터 업로드 ──
 app.post('/api/settle', async (req, res) => {
   try {
     const { region, data, weekStart } = req.body;
-    // 기존 데이터 삭제 후 새로 저장
     await supabase('DELETE', `/settle_data?region=eq.${region}&week_start=eq.${weekStart}`);
     const rows = [];
     for (const [name, dates] of Object.entries(data)) {
@@ -121,14 +115,11 @@ app.post('/api/settle', async (req, res) => {
         rows.push({ region, rider_name: name, date, fee, week_start: weekStart });
       }
     }
-    if (rows.length > 0) {
-      await supabase('POST', '/settle_data', rows);
-    }
+    if (rows.length > 0) await supabase('POST', '/settle_data', rows);
     res.json({ success: true, count: rows.length });
   } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
-// ── 정산 데이터 조회 ──
 app.get('/api/settle', async (req, res) => {
   try {
     const { region, weekStart } = req.query;
@@ -142,11 +133,16 @@ app.get('/api/settle', async (req, res) => {
   } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
-// ── 정산 데이터 초기화 (수요일 오후 3시) ──
 app.delete('/api/settle/:weekStart', async (req, res) => {
   try {
     await supabase('DELETE', `/settle_data?week_start=eq.${req.params.weekStart}`);
     res.json({ success: true });
   } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
+
+app.get('/', (req, res) => {
+  const allRiders = Object.values(baeminData).flatMap(d => d.riders || []);
+  res.json({ status: 'ok', riders: allRiders.length, regions: Object.keys(baeminData) });
+});
+
 app.listen(PORT, () => console.log('RideOn 서버 실행 중:', PORT));
