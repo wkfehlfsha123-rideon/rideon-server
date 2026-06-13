@@ -49,11 +49,17 @@ app.get('/api/data/:region', (req, res) => {
 
 app.post('/api/signup', async (req, res) => {
   try {
-    const { username, password, name, phone } = req.body;
-    if (!username || !password || !name) return res.status(400).json({ success: false, error: '모든 항목을 입력해주세요' });
+    const { username, password, name, phone, connect_id } = req.body;
+    if (!username || !password || !name || !connect_id) {
+      return res.status(400).json({ success: false, error: '모든 항목을 입력해주세요' });
+    }
     const existing = await supabase('GET', `/users?username=eq.${username}&select=id`);
-    if (existing.length > 0) return res.status(400).json({ success: false, error: '이미 사용 중인 아이디입니다' });
-    await supabase('POST', '/users', { username, password, name, phone, role: 'rider', approved: false });
+    if (existing.length > 0) {
+      return res.status(400).json({ success: false, error: '이미 사용 중인 아이디입니다' });
+    }
+    await supabase('POST', '/users', {
+      username, password, name, phone, connect_id, role: 'rider', approved: false
+    });
     res.json({ success: true, message: '가입 신청 완료! 관리자 승인 후 로그인 가능합니다' });
   } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
@@ -62,16 +68,30 @@ app.post('/api/login', async (req, res) => {
   try {
     const { username, password } = req.body;
     const users = await supabase('GET', `/users?username=eq.${username}&password=eq.${password}&select=*`);
-    if (!users || users.length === 0) return res.status(401).json({ success: false, error: '아이디 또는 비밀번호가 올바르지 않습니다' });
+    if (!users || users.length === 0) {
+      return res.status(401).json({ success: false, error: '아이디 또는 비밀번호가 올바르지 않습니다' });
+    }
     const user = users[0];
-    if (!user.approved) return res.status(403).json({ success: false, error: '관리자 승인 대기 중입니다' });
-    res.json({ success: true, user: { id: user.id, username: user.username, name: user.name, role: user.role, region: user.region } });
+    if (!user.approved) {
+      return res.status(403).json({ success: false, error: '관리자 승인 대기 중입니다' });
+    }
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        role: user.role,
+        region: user.region,
+        connect_id: user.connect_id,
+      }
+    });
   } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
 app.get('/api/users', async (req, res) => {
   try {
-    const users = await supabase('GET', '/users?select=id,username,name,role,region,approved,created_at&order=created_at.desc');
+    const users = await supabase('GET', '/users?select=id,username,name,role,region,approved,connect_id,created_at&order=created_at.desc');
     res.json({ success: true, users });
   } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
@@ -89,7 +109,9 @@ app.post('/api/find-id', async (req, res) => {
   try {
     const { name, phone } = req.body;
     const users = await supabase('GET', `/users?name=eq.${encodeURIComponent(name)}&phone=eq.${encodeURIComponent(phone)}&select=username`);
-    if (!users || users.length === 0) return res.status(404).json({ success: false, error: '일치하는 계정이 없습니다' });
+    if (!users || users.length === 0) {
+      return res.status(404).json({ success: false, error: '일치하는 계정이 없습니다' });
+    }
     res.json({ success: true, username: users[0].username });
   } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
@@ -98,7 +120,9 @@ app.post('/api/find-pw', async (req, res) => {
   try {
     const { username, phone } = req.body;
     const users = await supabase('GET', `/users?username=eq.${username}&phone=eq.${encodeURIComponent(phone)}&select=id`);
-    if (!users || users.length === 0) return res.status(404).json({ success: false, error: '일치하는 계정이 없습니다' });
+    if (!users || users.length === 0) {
+      return res.status(404).json({ success: false, error: '일치하는 계정이 없습니다' });
+    }
     const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
     const tempPw = Array.from({length: 8}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
     await supabase('PATCH', `/users?id=eq.${users[0].id}`, { password: tempPw });
