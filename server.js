@@ -190,8 +190,13 @@ app.delete('/api/settle/:weekStart', async (req, res) => {
 });
 
 app.get('/', (req, res) => {
-  const allRiders = Object.values(baeminData).flatMap(d => d.riders || []);
-  res.json({ status: 'ok', riders: allRiders.length, regions: Object.keys(baeminData) });
+ // ── 사용자 삭제 ──
+app.delete('/api/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await supabase('DELETE', `/users?id=eq.${id}`);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
 app.listen(PORT, () => console.log('RideOn 서버 실행 중:', PORT));
