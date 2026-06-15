@@ -138,16 +138,28 @@ app.post('/api/find-pw', async (req, res) => {
 app.post('/api/settle', async (req, res) => {
   try {
     const { region, data, weekStart } = req.body;
-    await supabase('DELETE', `/settle_data?region=eq.${region}&week_start=eq.${weekStart}`);
+    console.log('[settle] 업로드 시작:', region, weekStart, Object.keys(data).length, '명');
+    
+    const delResult = await supabase('DELETE', `/settle_data?region=eq.${region}&week_start=eq.${weekStart}`);
+    console.log('[settle] 삭제결과:', JSON.stringify(delResult));
+    
     const rows = [];
     for (const [name, dates] of Object.entries(data)) {
       for (const [date, fee] of Object.entries(dates)) {
         rows.push({ region, rider_name: name, date, fee, week_start: weekStart });
       }
     }
-    if (rows.length > 0) await supabase('POST', '/settle_data', rows);
+    console.log('[settle] 저장할 행수:', rows.length);
+    
+    if (rows.length > 0) {
+      const saveResult = await supabase('POST', '/settle_data', rows);
+      console.log('[settle] 저장결과:', JSON.stringify(saveResult).slice(0, 200));
+    }
     res.json({ success: true, count: rows.length });
-  } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+  } catch(e) { 
+    console.log('[settle] 오류:', e.message);
+    res.status(500).json({ success: false, error: e.message }); 
+  }
 });
 
 app.get('/api/settle', async (req, res) => {
