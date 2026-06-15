@@ -54,14 +54,19 @@ app.post('/api/signup', async (req, res) => {
       return res.status(400).json({ success: false, error: '모든 항목을 입력해주세요' });
     }
     const existing = await supabase('GET', `/users?username=eq.${username}&select=id`);
+    console.log('[signup] 중복확인:', JSON.stringify(existing));
     if (existing.length > 0) {
       return res.status(400).json({ success: false, error: '이미 사용 중인 아이디입니다' });
     }
-    await supabase('POST', '/users', {
+    const result = await supabase('POST', '/users', {
       username, password, name, phone, connect_id, role: 'rider', approved: false
     });
+    console.log('[signup] 저장결과:', JSON.stringify(result));
     res.json({ success: true, message: '가입 신청 완료! 관리자 승인 후 로그인 가능합니다' });
-  } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+  } catch(e) { 
+    console.log('[signup] 오류:', e.message);
+    res.status(500).json({ success: false, error: e.message }); 
+  }
 });
 
 app.post('/api/login', async (req, res) => {
