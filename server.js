@@ -26,29 +26,68 @@ async function supabase(method, path, body) {
   try { return JSON.parse(text); } catch(e) { return []; }
 }
 
-let baeminData = {};
+// ── 배민 데이터 저장 (Supabase upsert) ──────────────
+app.post('/api/data', async (req, res) => {
+  try {
+    const { regionId, riders, summary } = req.body;
+    const region = regionId || 'unknown';
+    const saved_at = new Date().toISOString();
 
-app.post('/api/data', (req, res) => {
-  const { regionId, riders, summary } = req.body;
-  const region = regionId || 'unknown';
-  baeminData[region] = { riders: riders || [], savedAt: new Date().toISOString(), summary };
-  console.log(`[RideOn] ${region} 데이터 수신: ${riders?.length}명`);
-  res.json({ success: true, region });
+    await fetch(`${SUPABASE_URL}/rest/v1/baemin_data`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Prefer': 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify({ region, riders: riders || [], summary, saved_at }),
+    });
+
+    console.log(`[RideOn] ${region} 데이터 저장: ${riders?.length}명`);
+    res.json({ success: true, region });
+  } catch(e) {
+    console.error('[/api/data POST]', e.message);
+    res.status(500).json({ success: false, error: e.message });
+  }
 });
 
-app.get('/api/data', (req, res) => {
-  const { region } = req.query;
-  if (region && baeminData[region]) return res.json(baeminData[region]);
-  const allRiders = Object.values(baeminData).flatMap(d => d.riders || []);
-  const latest = Object.values(baeminData).map(d => d.savedAt).sort().pop();
-  res.json({ riders: allRiders, savedAt: latest || null, regions: baeminData });
+// ── 배민 데이터 조회 ──────────────
+app.get('/api/data', async (req, res) => {
+  try {
+    const { region } = req.query;
+
+    if (region) {
+      const rows = await supabase('GET', `/baemin_data?region=eq.${region}&select=*`);
+      if (rows.length > 0) return res.json(rows[0]);
+      return res.json({ riders: [], savedAt: null });
+    }
+
+    // 전체 조회
+    const rows = await supabase('GET', '/baemin_data?select=*');
+    const allRiders = rows.flatMap(d => d.riders || []);
+    const latest = rows.map(d => d.saved_at).sort().pop();
+    const regions = {};
+    rows.forEach(d => { regions[d.region] = { riders: d.riders, savedAt: d.saved_at, summary: d.summary }; });
+
+    res.json({ riders: allRiders, savedAt: latest || null, regions });
+  } catch(e) {
+    console.error('[/api/data GET]', e.message);
+    res.status(500).json({ riders: [], error: e.message });
+  }
 });
 
-app.get('/api/data/:region', (req, res) => {
-  const { region } = req.params;
-  res.json(baeminData[region] || { riders: [], savedAt: null });
+// ── 지역별 조회 ──────────────
+app.get('/api/data/:region', async (req, res) => {
+  try {
+    const rows = await supabase('GET', `/baemin_data?region=eq.${req.params.region}&select=*`);
+    res.json(rows[0] || { riders: [], savedAt: null });
+  } catch(e) {
+    res.json({ riders: [], savedAt: null });
+  }
 });
 
+// ── 회원가입 ──────────────
 app.post('/api/signup', async (req, res) => {
   try {
     const { username, password, name, phone, connect_id } = req.body;
@@ -63,6 +102,7 @@ app.post('/api/signup', async (req, res) => {
   } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
+// ── 로그인 ──────────────
 app.post('/api/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -74,6 +114,7 @@ app.post('/api/login', async (req, res) => {
   } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
+// ── 사용자 목록 ──────────────
 app.get('/api/users', async (req, res) => {
   try {
     const users = await supabase('GET', '/users?select=id,username,name,role,region,approved,connect_id,created_at&order=created_at.desc');
@@ -81,6 +122,7 @@ app.get('/api/users', async (req, res) => {
   } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
+// ── 사용자 수정 ──────────────
 app.patch('/api/users/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -90,6 +132,7 @@ app.patch('/api/users/:id', async (req, res) => {
   } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
+// ── 사용자 삭제 ──────────────
 app.delete('/api/users/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -98,6 +141,7 @@ app.delete('/api/users/:id', async (req, res) => {
   } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
+// ── 아이디 찾기 ──────────────
 app.post('/api/find-id', async (req, res) => {
   try {
     const { name, phone } = req.body;
@@ -107,6 +151,7 @@ app.post('/api/find-id', async (req, res) => {
   } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
+// ── 비밀번호 찾기 ──────────────
 app.post('/api/find-pw', async (req, res) => {
   try {
     const { username, phone } = req.body;
@@ -119,6 +164,7 @@ app.post('/api/find-pw', async (req, res) => {
   } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
+// ── 정산 저장 ──────────────
 app.post('/api/settle', async (req, res) => {
   try {
     const { region, data, weekStart } = req.body;
@@ -141,6 +187,7 @@ app.post('/api/settle', async (req, res) => {
   }
 });
 
+// ── 정산 조회 ──────────────
 app.get('/api/settle', async (req, res) => {
   try {
     const { region, weekStart } = req.query;
@@ -154,6 +201,7 @@ app.get('/api/settle', async (req, res) => {
   } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
+// ── 정산 삭제 ──────────────
 app.delete('/api/settle/:weekStart', async (req, res) => {
   try {
     await supabase('DELETE', `/settle_data?week_start=eq.${req.params.weekStart}`);
@@ -161,9 +209,16 @@ app.delete('/api/settle/:weekStart', async (req, res) => {
   } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
-app.get('/', (req, res) => {
-  const allRiders = Object.values(baeminData).flatMap(d => d.riders || []);
-  res.json({ status: 'ok', riders: allRiders.length, regions: Object.keys(baeminData) });
+// ── 상태 확인 ──────────────
+app.get('/', async (req, res) => {
+  try {
+    const rows = await supabase('GET', '/baemin_data?select=region,saved_at');
+    const info = {};
+    rows.forEach(r => { info[r.region] = r.saved_at; });
+    res.json({ status: 'ok', regions: info });
+  } catch(e) {
+    res.json({ status: 'ok', regions: {} });
+  }
 });
 
 app.listen(PORT, () => console.log('RideOn 서버 실행 중:', PORT));
