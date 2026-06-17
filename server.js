@@ -29,7 +29,7 @@ async function supabase(method, path, body) {
 // ── 배민 데이터 저장 (Supabase upsert) ──────────────
 app.post('/api/data', async (req, res) => {
   try {
-    const { regionId, riders, summary } = req.body;
+    const { regionId, riders, weekRiders, summary } = req.body;
     const region = regionId || 'unknown';
     const saved_at = new Date().toISOString();
 
@@ -41,10 +41,10 @@ app.post('/api/data', async (req, res) => {
         'Authorization': `Bearer ${SUPABASE_KEY}`,
         'Prefer': 'resolution=merge-duplicates,return=minimal',
       },
-      body: JSON.stringify({ region, riders: riders || [], summary, saved_at }),
+      body: JSON.stringify({ region, riders: riders || [], week_riders: weekRiders || [], summary, saved_at }),
     });
 
-    console.log(`[RideOn] ${region} 데이터 저장: ${riders?.length}명`);
+    console.log(`[RideOn] ${region} 데이터 저장: ${riders?.length}명 / 주간 ${weekRiders?.length || 0}명`);
     res.json({ success: true, region });
   } catch(e) {
     console.error('[/api/data POST]', e.message);
@@ -59,21 +59,25 @@ app.get('/api/data', async (req, res) => {
 
     if (region) {
       const rows = await supabase('GET', `/baemin_data?region=eq.${region}&select=*`);
-      if (rows.length > 0) return res.json(rows[0]);
-      return res.json({ riders: [], savedAt: null });
+      if (rows.length > 0) {
+        const row = rows[0];
+        return res.json({ ...row, weekRiders: row.week_riders || [] });
+      }
+      return res.json({ riders: [], weekRiders: [], savedAt: null });
     }
 
     // 전체 조회
     const rows = await supabase('GET', '/baemin_data?select=*');
     const allRiders = rows.flatMap(d => d.riders || []);
+    const allWeekRiders = rows.flatMap(d => d.week_riders || []);
     const latest = rows.map(d => d.saved_at).sort().pop();
     const regions = {};
-    rows.forEach(d => { regions[d.region] = { riders: d.riders, savedAt: d.saved_at, summary: d.summary }; });
+    rows.forEach(d => { regions[d.region] = { riders: d.riders, weekRiders: d.week_riders || [], savedAt: d.saved_at, summary: d.summary }; });
 
-    res.json({ riders: allRiders, savedAt: latest || null, regions });
+    res.json({ riders: allRiders, weekRiders: allWeekRiders, savedAt: latest || null, regions });
   } catch(e) {
     console.error('[/api/data GET]', e.message);
-    res.status(500).json({ riders: [], error: e.message });
+    res.status(500).json({ riders: [], weekRiders: [], error: e.message });
   }
 });
 
