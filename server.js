@@ -213,6 +213,28 @@ app.delete('/api/settle/:weekStart', async (req, res) => {
   } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
+// ── 날짜별 정산 삭제 ──────────────
+app.delete('/api/settle/:weekStart/:date', async (req, res) => {
+  try {
+    const { weekStart, date } = req.params;
+    const { region } = req.query;
+    let query = `/settle_data?week_start=eq.${weekStart}&date=eq.${date}`;
+    if (region) query += `&region=eq.${region}`;
+    await supabase('DELETE', query);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// ── 업로드된 정산 날짜 목록 조회 ──────────────
+app.get('/api/settle/dates', async (req, res) => {
+  try {
+    const { region, weekStart } = req.query;
+    const rows = await supabase('GET', `/settle_data?region=eq.${region}&week_start=eq.${weekStart}&select=date&order=date.asc`);
+    const dates = [...new Set((rows||[]).map(r => r.date))];
+    res.json({ success: true, dates });
+  } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
 // ── 상태 확인 ──────────────
 app.get('/', async (req, res) => {
   try {
