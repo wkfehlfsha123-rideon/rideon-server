@@ -236,6 +236,37 @@ app.get('/api/settle/dates', async (req, res) => {
 });
 
 // ── 상태 확인 ──────────────
+// ── 공지사항 목록 조회 ──────────────
+app.get('/api/notices', async (req, res) => {
+  try {
+    const { region } = req.query;
+    let query = '/notices?order=created_at.desc';
+    if (region && region !== 'all') {
+      query = `/notices?or=(region.eq.all,region.eq.${region})&order=created_at.desc`;
+    }
+    const rows = await supabase('GET', query);
+    res.json({ success: true, notices: rows || [] });
+  } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// ── 공지사항 작성 ──────────────
+app.post('/api/notices', async (req, res) => {
+  try {
+    const { title, content, type, region } = req.body;
+    if (!title || !content) return res.status(400).json({ success: false, error: '제목과 내용을 입력해주세요' });
+    await supabase('POST', '/notices', { title, content, type: type||'general', region: region||'all' });
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// ── 공지사항 삭제 ──────────────
+app.delete('/api/notices/:id', async (req, res) => {
+  try {
+    await supabase('DELETE', `/notices?id=eq.${req.params.id}`);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
 app.get('/', async (req, res) => {
   try {
     const rows = await supabase('GET', '/baemin_data?select=region,saved_at');
