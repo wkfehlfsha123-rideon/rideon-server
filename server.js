@@ -10,7 +10,7 @@ app.use(cors());
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 
-async function supabase(method, path, body) {
+async function supabase(method, path, body, extraHeaders) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1${path}`, {
     method,
     headers: {
@@ -18,6 +18,7 @@ async function supabase(method, path, body) {
       'apikey': SUPABASE_KEY,
       'Authorization': `Bearer ${SUPABASE_KEY}`,
       'Prefer': method === 'POST' ? 'return=representation' : 'return=minimal',
+      ...(extraHeaders || {}),
     },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -263,6 +264,26 @@ app.post('/api/notices', async (req, res) => {
 app.delete('/api/notices/:id', async (req, res) => {
   try {
     await supabase('DELETE', `/notices?id=eq.${req.params.id}`);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// ── 지역 설정(세트 수, 지부장 정보) 조회 ──────────────
+app.get('/api/region-settings', async (req, res) => {
+  try {
+    const rows = await supabase('GET', '/region_settings?select=*');
+    res.json({ success: true, settings: rows || [] });
+  } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// ── 지역 설정 저장(upsert) ──────────────
+app.post('/api/region-settings', async (req, res) => {
+  try {
+    const { region, sets, manager_name, manager_phone } = req.body;
+    if (!region) return res.status(400).json({ success: false, error: 'region 필요' });
+    await supabase('POST', '/region_settings?on_conflict=region', {
+      region, sets, manager_name, manager_phone, updated_at: new Date().toISOString()
+    }, { 'Prefer': 'resolution=merge-duplicates' });
     res.json({ success: true });
   } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
