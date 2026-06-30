@@ -127,6 +127,22 @@ app.get('/api/users', async (req, res) => {
   } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
+// ── 사용자 유효성 확인 (삭제/승인취소 여부 체크용, 자동 로그아웃에 사용) ──────────────
+app.get('/api/users/:id/check', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const users = await supabase('GET', `/users?id=eq.${id}&select=id,approved,role,region,regions`);
+    if (!users || users.length === 0) {
+      return res.json({ valid: false, reason: 'deleted' });
+    }
+    const u = users[0];
+    if (!u.approved) {
+      return res.json({ valid: false, reason: 'unapproved' });
+    }
+    res.json({ valid: true, role: u.role, region: u.region, regions: u.regions });
+  } catch(e) { res.status(500).json({ valid: true }); } // 오류 시엔 안전하게 통과(서버 장애로 강제 로그아웃 방지)
+});
+
 // ── 사용자 수정 ──────────────
 app.patch('/api/users/:id', async (req, res) => {
   try {
