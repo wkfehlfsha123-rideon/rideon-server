@@ -131,8 +131,14 @@ app.get('/api/users', async (req, res) => {
 app.patch('/api/users/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { approved, role, region } = req.body;
-    await supabase('PATCH', `/users?id=eq.${id}`, { approved, role, region });
+    const { approved, role, region, regions, password } = req.body;
+    const patch = {};
+    if (approved !== undefined) patch.approved = approved;
+    if (role !== undefined) patch.role = role;
+    if (region !== undefined) patch.region = region;
+    if (regions !== undefined) patch.regions = regions; // 서브관리자 다중 지역 담당
+    if (password !== undefined) patch.password = password;
+    await supabase('PATCH', `/users?id=eq.${id}`, patch);
     res.json({ success: true });
   } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
